@@ -39,7 +39,8 @@ function exclude_node_title_preprocess_page(&$vars, $hook) {
       // remove title on a per node type basis
       if (is_object($vars['node'])) {
         $node_type = $vars['node']->type;
-      } else {
+      }
+      else {
         $node = node_load(arg(1));
         $node_type = $node->type;
         unset($node); // memory cleanup

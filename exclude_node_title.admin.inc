@@ -1,4 +1,12 @@
 <?php
+// $Id$
+/**
+ * @file
+ * Exclude Node Title Administrative Interface
+ *
+ * @author Gabriel Ungureanu
+ * gabriel.ungreanu@ag-prime.com
+ */
 
 /**
  * Admin configuration form
