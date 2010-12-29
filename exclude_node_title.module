@@ -8,6 +8,13 @@
  * gabriel.ungreanu@ag-prime.com
  */
 
+function exclude_node_title_perm() {
+  return array('administer exclude node title',
+    'exclude any node title',
+    'exclude own node title',
+    'ignore node title exclusions');
+}
+
 /**
  * Implementation of hook_menu().
  */
@@ -18,7 +25,7 @@ function exclude_node_title_menu() {
     'description' => 'Exclude Node Title from display',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('exclude_node_title_admin_settings'),
-    'access arguments' => array('administer site configuration'),
+    'access arguments' => array('administer exclude node title'),
     'type' => MENU_NORMAL_ITEM,
     'file' => 'exclude_node_title.admin.inc',
   );
@@ -30,7 +37,7 @@ function exclude_node_title_menu() {
  * Implementation of hook_preprocess_page().
  */
 function exclude_node_title_preprocess_page(&$vars, $hook) {
-  if (arg(0) == 'node' && is_numeric(arg(1))) {
+  if (arg(0) == 'node' && is_numeric(arg(1)) && !user_access('ignore node title exclusions')) {
     if (in_array(arg(1), variable_get('exclude_node_title_nid_list', array()))) {
       // remove title on a per node id basis
       $vars['title'] = '';
@@ -51,7 +58,6 @@ function exclude_node_title_preprocess_page(&$vars, $hook) {
       }
       unset($exclude_node_title_content_type, $node_type); // memory cleanup
     }
-    
   }
 }
 
@@ -59,7 +65,7 @@ function exclude_node_title_preprocess_page(&$vars, $hook) {
  * Implementation of hook_nodeapi().
  */
 function exclude_node_title_nodeapi(&$node, $op) {
-  if (variable_get('exclude_node_title_remove_title', 0) == 1) {
+  if (variable_get('exclude_node_title_remove_title', 0) == 1 && !user_access('ignore node title exclusions')) {
     switch ($op) {
       case 'view':
         if (in_array($node->nid, variable_get('exclude_node_title_nid_list', array()))) {
@@ -83,6 +89,13 @@ function exclude_node_title_nodeapi(&$node, $op) {
  */
 function exclude_node_title_form_alter(&$form, &$form_state, $form_id) {
   if (isset($form['type']) && isset($form['#node']) && $form['type']['#value'] .'_node_form' == $form_id) {
+    if (!user_access('exclude any node title')) {
+      global $user;
+      if (!user_access('exclude own node title') ||
+              ( user_access('exclude own node title') && strcmp($form['#node']->name, $user->name) ) ) {
+        return FALSE;
+      }
+    }
     $weight = $form['title']['#weight']+1;
     $form['exclude_node_title'] = array(
       '#type' => 'checkbox',
