@@ -8,6 +8,10 @@
  * gabriel.ungreanu@ag-prime.com
  */
 
+
+/**
+ * Implementation of hook_perm().
+ */
 function exclude_node_title_perm() {
   return array('administer exclude node title',
     'exclude any node title',
