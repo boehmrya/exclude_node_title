@@ -57,7 +57,7 @@ function exclude_node_title_preprocess_page(&$vars, $hook) {
         unset($node); // memory cleanup
       }
       $exclude_node_title_content_type = variable_get('exclude_node_title_content_type_values', array());
-      if ($exclude_node_title_content_type[$node_type]) {
+      if (isset($exclude_node_title_content_type[$node_type])) {
         $vars['title'] = '';
       }
       unset($exclude_node_title_content_type, $node_type); // memory cleanup
