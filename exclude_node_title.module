@@ -16,7 +16,7 @@ function exclude_node_title_perm() {
   return array('administer exclude node title',
     'exclude any node title',
     'exclude own node title',
-    'ignore node title exclusions');
+    'use exclude node title');
 }
 
 /**
@@ -41,7 +41,7 @@ function exclude_node_title_menu() {
  * Implementation of hook_preprocess_page().
  */
 function exclude_node_title_preprocess_page(&$vars, $hook) {
-  if (arg(0) == 'node' && is_numeric(arg(1)) && !user_access('ignore node title exclusions')) {
+  if (arg(0) == 'node' && is_numeric(arg(1)) && user_access('use exclude node title')) {
     if (in_array(arg(1), variable_get('exclude_node_title_nid_list', array()))) {
       // remove title on a per node id basis
       $vars['title'] = '';
@@ -69,7 +69,7 @@ function exclude_node_title_preprocess_page(&$vars, $hook) {
  * Implementation of hook_nodeapi().
  */
 function exclude_node_title_nodeapi(&$node, $op) {
-  if (variable_get('exclude_node_title_remove_title', 0) == 1 && !user_access('ignore node title exclusions')) {
+  if (variable_get('exclude_node_title_remove_title', 0) == 1 && user_access('use exclude node title')) {
     switch ($op) {
       case 'view':
         if (in_array($node->nid, variable_get('exclude_node_title_nid_list', array()))) {
