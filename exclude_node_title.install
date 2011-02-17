@@ -27,7 +27,7 @@ function exclude_node_title_uninstall() {
  * Implementation of hook_update_N().
  * We need to add permission to use exclude node title to all roles that didn't had the ignore permission.
  */
-function exclude_node_title_update_6001() {
+function exclude_node_title_update_6002() {
   $items = array();
   $items[] = update_sql("UPDATE {permission} p
     SET p.`perm` = CONCAT(p.`perm`, ', use exclude node title')
