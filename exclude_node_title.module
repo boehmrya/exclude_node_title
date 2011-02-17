@@ -57,7 +57,7 @@ function exclude_node_title_preprocess_page(&$vars, $hook) {
         unset($node); // memory cleanup
       }
       $exclude_node_title_content_type = variable_get('exclude_node_title_content_type_values', array());
-      if (isset($exclude_node_title_content_type[$node_type])) {
+      if ($exclude_node_title_content_type[$node_type]) {
         $vars['title'] = '';
       }
       unset($exclude_node_title_content_type, $node_type); // memory cleanup
@@ -124,7 +124,7 @@ function exclude_node_title_node_edit_form_submit($form, &$form_state) {
       variable_set('exclude_node_title_nid_list', $exclude_list);
       return;
     }
-    elseif ($form_state['values']['exclude_node_title'] == 0 && $is_excluded) {
+    elseif ($form_state['values']['exclude_node_title'] == 0 && $is_excluded !== FALSE) {
       unset($exclude_list[$is_excluded]);
       variable_set('exclude_node_title_nid_list', $exclude_list);
       return;

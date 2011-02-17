@@ -30,10 +30,10 @@ function exclude_node_title_uninstall() {
 function exclude_node_title_update_6001() {
   $items = array();
   $items[] = update_sql("UPDATE {permission} p
-    SET p.`perm` = CONCAT(p.`perm`, ' use exclude node title')
+    SET p.`perm` = CONCAT(p.`perm`, ', use exclude node title')
     WHERE p.`perm` NOT LIKE '%ignore node title exclusions%'");
   $items[] = update_sql("UPDATE {permission} p
-    SET p.`perm` = REPLACE(p.`perm`, 'ignore node title exclusions', '')
+    SET p.`perm` = REPLACE(p.`perm`, ', ignore node title exclusions', '')
     WHERE p.`perm` NOT LIKE '%ignore node title exclusions%'");
   return $items;
 }
