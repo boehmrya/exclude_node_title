@@ -24,8 +24,8 @@ function exclude_node_title_perm() {
 function exclude_node_title_menu() {
 
   $items['admin/settings/exclude_node_title'] = array(
-    'title' => 'Exclude Node Title from display',
-    'description' => 'Exclude Node Title from display',
+    'title' => t('Exclude Node Title from display'),
+    'description' => t('Exclude Node Title from display'),
     'page callback' => 'drupal_get_form',
     'page arguments' => array('exclude_node_title_admin_settings'),
     'access arguments' => array('administer exclude node title'),
@@ -102,7 +102,7 @@ function exclude_node_title_form_alter(&$form, &$form_state, $form_id) {
     $weight = $form['title']['#weight']+1;
     $form['exclude_node_title'] = array(
       '#type' => 'checkbox',
-      '#title' => 'Exclude title from display',
+      '#title' => t('Exclude title from display'),
       '#required' => FALSE,
       '#default_value' => (!empty($form['nid']['#value']) ? in_array($form['nid']['#value'], variable_get('exclude_node_title_nid_list', array())) : FALSE ),
       '#weight' => $weight,
