@@ -10,7 +10,8 @@
  */
 function exclude_node_title_install() {
   // by default all users will have permission to use exclude node title
-  db_query("UPDATE {permission} p SET p.`perm` = CONCAT(p.`perm`,', use exclude node title')");
+  db_query("UPDATE {permission} p SET p.`perm` = TRIM(LEADING ', ' FROM CONCAT(p.`perm`, ', use exclude node title'))");
+
 }
 
 /**
