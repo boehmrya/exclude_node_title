@@ -47,16 +47,16 @@ function exclude_node_title_preprocess_page(&$vars, $hook) {
     }
     else {
       // remove title on a per node type basis
-      if (is_object($vars['node'])) {
+      if (isset($vars['node']) && is_object($vars['node'])) {
         $node_type = $vars['node']->type;
       }
-      else {
+      elseif ( is_numeric(arg(1)) ) {
         $node = node_load(arg(1));
         $node_type = $node->type;
         unset($node); // memory cleanup
       }
       $exclude_node_title_content_type = variable_get('exclude_node_title_content_type_values', array());
-      if (!empty($exclude_node_title_content_type) && $exclude_node_title_content_type[$node_type]) {
+      if (!empty($exclude_node_title_content_type) && isset($exclude_node_title_content_type[$node_type])) {
         $vars['title'] = '';
       }
       unset($exclude_node_title_content_type, $node_type); // memory cleanup
