@@ -99,7 +99,7 @@ function exclude_node_title_form_alter(&$form, &$form_state, $form_id) {
         return FALSE;
       }
     }
-    $weight = $form['title']['#weight']+1;
+    $weight = $form['title']['#weight']+0.1;
     $form['exclude_node_title'] = array(
       '#type' => 'checkbox',
       '#title' => t('Exclude title from display'),
