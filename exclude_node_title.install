@@ -21,6 +21,7 @@ function exclude_node_title_uninstall() {
   variable_del('exclude_node_title_nid_list');
   variable_del('exclude_node_title_remove_title');
   variable_del('exclude_node_title_content_type_values');
+  variable_del('exclude_node_title_search');
 }
 
 /*

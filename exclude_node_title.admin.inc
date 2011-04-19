@@ -26,6 +26,13 @@ function exclude_node_title_admin_settings() {
     '#default_value' => variable_get('exclude_node_title_remove_title', 0),
   );
 
+  $form['exclude_node_title_search'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Remove node title from search pages'),
+    '#description' => t('Select if you wish to remove title from search pages.'),
+    '#default_value' => variable_get('exclude_node_title_search', 0),
+  );
+
   $form['exclude_node_title_content_type'] = array(
     '#type' => 'fieldset',
     '#title' => t('Exclude title by content-type'),

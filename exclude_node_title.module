@@ -61,7 +61,11 @@ function exclude_node_title_preprocess_page(&$vars, $hook) {
       }
       unset($exclude_node_title_content_type, $node_type); // memory cleanup
     }
+  } 
+  elseif (arg(0) == 'search' && variable_get('exclude_node_title_search', 0)) {
+    $vars['title'] = '';
   }
+
 }
 
 /**
