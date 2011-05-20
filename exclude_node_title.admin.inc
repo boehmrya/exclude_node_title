@@ -44,7 +44,7 @@ function exclude_node_title_admin_settings() {
   $node_types = node_get_types('names');
   $form['exclude_node_title_content_type']['exclude_node_title_content_type_values'] = array(
     '#type' => 'checkboxes',
-    '#title' => $name,
+    '#title' => t('Content-types'),
     '#default_value' => variable_get('exclude_node_title_content_type_values', array()),
     '#options' => $node_types,
   );
