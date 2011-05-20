@@ -11,14 +11,6 @@
  * Admin configuration form
  */
 function exclude_node_title_admin_settings() {
-  $form['exclude_node_title_nid_list'] = array(
-    '#type' => 'textarea',
-    '#title' => t('Exclude node title from display'),
-    '#description' => t('Select nodes to exclude title from display. One $nid per line.'),
-    '#default_value' => implode("\n", variable_get('exclude_node_title_nid_list', array())),
-    '#wysiwyg' => FALSE,
-  );
-
   $form['exclude_node_title_remove_title'] = array(
     '#type' => 'checkbox',
     '#title' => t('Remove node title from teasers too'),
