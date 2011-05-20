@@ -92,9 +92,25 @@ function exclude_node_title_nodeapi(&$node, $op) {
 }
 
 /**
+ * Implementation of hook_content_extra_fields().
+ */
+function exclude_node_title_content_extra_fields($type_name) {
+  // @todo Check based on $type_name if we should show the field on this Content-type
+  $extras['exclude_node_title'] = array(
+    'label' => t('Exclude title from display'),
+    'description' => t('Exclude Node Title module form.'),
+    'weight' => -4,
+  );
+  return $extras;
+}
+
+/**
  * Implementation of hook_form_alter().
  */
 function exclude_node_title_form_alter(&$form, &$form_state, $form_id) {
+//  if($form_id == 'user_profile_form'){
+//
+//  }
   if (isset($form['type']) && isset($form['#node']) && $form['type']['#value'] .'_node_form' == $form_id) {
     if (!user_access('exclude any node title')) {
       global $user;
