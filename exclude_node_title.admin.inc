@@ -1,4 +1,5 @@
 <?php
+// $Id$
 /**
  * @file
  * Exclude Node Title Administrative Interface

@@ -40,8 +40,20 @@ function exclude_node_title_menu() {
  * Implementation of hook_preprocess_page().
  */
 function exclude_node_title_preprocess_page(&$vars, $hook) {
-  if (arg(0) == 'node' && is_numeric(arg(1)) && user_access('use exclude node title')) {
-    if (in_array(arg(1), variable_get('exclude_node_title_nid_list', array()))) {
+  if (!user_access('use exclude node title')) { // user doesn't have access to module
+    return;
+  }
+  // exclude from path node/<nid>
+  $nid = FALSE;
+  if (arg(0) == 'node' && is_numeric(arg(1))) {
+    $nid = arg(1);
+  }
+  elseif (arg(0) == 'search' && variable_get('exclude_node_title_search', 0)) {
+    $vars['title'] = '';
+    return;
+  }
+  if ($nid) {
+    if (in_array($nid, variable_get('exclude_node_title_nid_list', array()))) {
       // remove title on a per node id basis
       $vars['title'] = '';
     }
@@ -50,44 +62,38 @@ function exclude_node_title_preprocess_page(&$vars, $hook) {
       if (isset($vars['node']) && is_object($vars['node'])) {
         $node_type = $vars['node']->type;
       }
-      elseif ( is_numeric(arg(1)) ) {
-        $node = node_load(arg(1));
+      elseif ( is_numeric($nid) ) {
+        $node = node_load($nid);
         $node_type = $node->type;
         unset($node); // memory cleanup
       }
-      $exclude_node_title_content_type = variable_get('exclude_node_title_content_type_values', array());
+      $exclude_node_title_content_type = exclude_node_title_content_type();
       if (!empty($exclude_node_title_content_type) && !empty($exclude_node_title_content_type[$node_type])) {
         $vars['title'] = '';
       }
-      unset($exclude_node_title_content_type, $node_type); // memory cleanup
     }
   } 
-  elseif (arg(0) == 'search' && variable_get('exclude_node_title_search', 0)) {
-    $vars['title'] = '';
-  }
-
 }
 
 /**
  * Implementation of hook_nodeapi().
  */
 function exclude_node_title_nodeapi(&$node, $op) {
-  if (variable_get('exclude_node_title_remove_title', 0) == 1 && user_access('use exclude node title')) {
-    switch ($op) {
-      case 'view':
-        if (in_array($node->nid, variable_get('exclude_node_title_nid_list', array()))) {
+  if ( (variable_get('exclude_node_title_remove_title', 0) == 0 && !(arg(0) == 'comment' && arg(1) == 'reply' && is_numeric(arg(2))))
+          || !user_access('use exclude node title')) {
+    return;
+  }
+  switch ($op) {
+    case 'view':
+      if (in_array($node->nid, variable_get('exclude_node_title_nid_list', array()))) {
+        $node->title = '';
+      }
+      else {
+        $exclude_node_title_content_type = exclude_node_title_content_type();
+        if (!empty($exclude_node_title_content_type[$node->type])) {
           $node->title = '';
         }
-        else {
-          static $exclude_node_title_content_type; // perform static caching of variable
-          if (!isset($exclude_node_title_content_type)) {
-            $exclude_node_title_content_type = variable_get('exclude_node_title_content_type_values', array());
-          }
-          if ($exclude_node_title_content_type[$node->type]) {
-            $node->title = '';
-          }
-        }
-    }
+      }
   }
 }
 
@@ -127,6 +133,11 @@ function exclude_node_title_form_alter(&$form, &$form_state, $form_id) {
       '#default_value' => (!empty($form['nid']['#value']) ? in_array($form['nid']['#value'], variable_get('exclude_node_title_nid_list', array())) : FALSE ),
       '#weight' => $weight,
     );
+    $exclude_node_title_content_type = exclude_node_title_content_type();
+    if (!empty($exclude_node_title_content_type[$form['#node']->type])) {
+      $form['exclude_node_title']['#disabled'] = TRUE;
+      $form['exclude_node_title']['#description'] = t('Title already hidden by content-type in Exclude Node Title !url page.', array('!url' => l(t('settings'), 'admin/settings/exclude_node_title')));
+    }
     $form['#submit'][] = 'exclude_node_title_node_edit_form_submit';
   }
 }
@@ -149,4 +160,15 @@ function exclude_node_title_node_edit_form_submit($form, &$form_state) {
       return;
     }
   }
+}
+
+/*
+ * Variable getter, using static caching
+ */
+function exclude_node_title_content_type($reset = FALSE) {
+  static $exclude_node_title_content_type; // perform static caching of variable
+  if (!is_array($exclude_node_title_content_type) || $reset) {
+    $exclude_node_title_content_type = variable_get('exclude_node_title_content_type_values', array());
+  }
+  return $exclude_node_title_content_type;
 }
