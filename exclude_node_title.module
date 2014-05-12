@@ -7,6 +7,27 @@
  * This is the main module file for Exclude Node Title. 
  */
 
+use Drupal\Component\Utility\Xss;
+use Drupal\Core\Language\Language;
+use Drupal\Core\Render\Element;
+use Drupal\Core\Url;
+use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+use Drupal\Core\Cache\Cache;
+use Drupal\Core\Database\Query\AlterableInterface;
+use Drupal\Core\Database\Query\SelectInterface;
+use Drupal\node\NodeTypeInterface;
+use Drupal\node\NodeInterface;
+use Drupal\Core\Entity\EntityInterface;
+use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
+use Drupal\Core\Entity\Display\EntityFormDisplayInterface;
+use Drupal\Core\Template\Attribute;
+use Drupal\file\Entity\File;
+use Drupal\language\Entity\Language as LanguageEntity;
+use Symfony\Cmf\Component\Routing\RouteObjectInterface;
+use Drupal\Core\Session\AccountInterface;
+use Drupal\Core\Field\FieldDefinition;
+
 /**
  * Implements hook_permission().
  */ 
@@ -28,36 +49,12 @@ function exclude_node_title_permission() {
 }
 
 /**
- * Implements hook_menu().
- */
-function exclude_node_title_menu() {
-  $items = array();
-  $items['admin/config/content/exclude_node_title'] = array(
-    'title' => 'Exclude Node Title',
-    'description' => 'Exclude Node Title from display',
-    'page callback' => 'drupal_get_form',
-    'page arguments' => array('exclude_node_title_admin_settings'),
-    'access arguments' => array('administer exclude node title'),
-    'type' => MENU_NORMAL_ITEM,
-    'file' => 'exclude_node_title.admin.inc',
-  );
-  return $items;
-}
-
-/**
- * Implements hook_preprocess_overlay().
- */
-function exclude_node_title_preprocess_overlay(&$vars) {
-  exclude_node_title_preprocess_page($vars);
-}
-
-/**
- * Implements hook_preprocess_page().
- */
+  * Implements hook_preprocess_page().
+  */
 function exclude_node_title_preprocess_page(&$vars) {
-  if (!user_access('use exclude node title') || (arg(0) == 'node' && arg(1) == 'add')) {
-    return;
-  }
+   if (!\Drupal::currentUser()->hasPermission('use exclude node title')) {
+     return;
+   }
 
   if (arg(0) == 'node' && is_numeric(arg(1))) {
     switch (arg(2)) {
@@ -70,10 +67,7 @@ function exclude_node_title_preprocess_page(&$vars) {
         $view_mode = 'full';
         break;
     }
-
     _exclude_node_title_preprocess($vars, arg(1), $view_mode);
-  } else if (isset($vars['page']['content']['system_main']['#node_edit_form']) && $vars['page']['content']['system_main']['#node_edit_form'] == TRUE) {
-    _exclude_node_title_preprocess($vars, $vars['page']['content']['system_main']['#node'], 'nodeform');
   }
 }
 
@@ -81,7 +75,7 @@ function exclude_node_title_preprocess_page(&$vars) {
  * Implements hook_preprocess_node().
  */
 function exclude_node_title_preprocess_node(&$vars) {
-  if (user_access('use exclude node title')) {
+  if (\Drupal::currentUser()->hasPermission('use exclude node title')) {
     _exclude_node_title_preprocess($vars, $vars['node'], $vars['view_mode']);
   }
 }
@@ -91,10 +85,13 @@ function exclude_node_title_preprocess_node(&$vars) {
  */
 function _exclude_node_title_preprocess(&$vars, $node, $view_mode) {
   if (_exclude_node_title($node, $view_mode)) {
-    $vars['title'] = '';
+    list($nid, $node_type) = _exclude_node_title_var_get_node($node);
+
     if ($view_mode == 'nodeform') {
-      // Also remove the field from the form
-      $vars['page']['content']['system_main']['title']['#access'] = false;
+      $node_types = node_type_get_names();
+      $vars['title'] = t('Edit !nodetype', array('!nodetype' => $node_types[$node_type]));
+    } else {
+      $vars['title'] = '';
     }
   }
 }
@@ -103,7 +100,8 @@ function _exclude_node_title_preprocess(&$vars, $node, $view_mode) {
  * Implements hook_preprocess_search_result().
  */
 function exclude_node_title_preprocess_search_result(&$vars) {
-  if (user_access('use exclude node title') && variable_get('exclude_node_title_search', 0)) {
+  $config = \Drupal::config('exclude_node_title.settings');
+  if (\Drupal::currentUser()->hasPermission('use exclude node title') && $config->get('exclude_node_title_search')) {
     $vars['title'] = '';
   }
 }
@@ -112,7 +110,7 @@ function exclude_node_title_preprocess_search_result(&$vars) {
  * Implements hook_node_update()
  */
 function exclude_node_title_node_update($node) {
-  if (isset($node->exclude_node_title) && exclude_node_title_check_perm($node)) {
+  if (!empty($node->get('title')->getString()) && exclude_node_title_check_perm($node)) {
     exclude_node_title_set_flag($node, $node->exclude_node_title);
   }
 }
@@ -121,7 +119,7 @@ function exclude_node_title_node_update($node) {
  * Implements hook_node_insert()
  */
 function exclude_node_title_node_insert($node) {
-  if (isset($node->exclude_node_title) && exclude_node_title_check_perm($node)) {
+  if (!empty($node->get('title')->getString()) && exclude_node_title_check_perm($node)) {
     exclude_node_title_set_flag($node, $node->exclude_node_title);
   }
 }
@@ -130,7 +128,7 @@ function exclude_node_title_node_insert($node) {
  * Implements hook_node_delete()
  */
 function exclude_node_title_node_delete($node) {
-  if (isset($node->exclude_node_title) && $node->exclude_node_title == 1 ) {
+  if (!empty($node->get('title')->getString()) && $node->exclude_node_title == 1 ) {
     exclude_node_title_set_flag($node, 0);
   }
 }
@@ -140,49 +138,57 @@ function exclude_node_title_node_delete($node) {
  */
 function exclude_node_title_check_perm($node) {
   global $user;
-  if (user_access('exclude any node title'))
+  if (\Drupal::currentUser()->hasPermission('exclude any node title'))
     return TRUE;
-  if (!user_access('exclude own node title'))
-    return FALSE;
-  return !strcmp($node->name, $user->name);
+  if (\Drupal::currentUser()->hasPermission('exclude own node title'))
+    return TRUE;
+  return FALSE;
 }
 
 /**
  * Implements hook_form_alter().
  */
 function exclude_node_title_form_alter(&$form, &$form_state, $form_id) {
-  if (isset($form['type']) && isset($form['#node']) && $form['type']['#value'] . '_node_form' == $form_id) {
+
+  $node_type = !empty($form_state['form_display']->bundle) ? $form_state['form_display']->bundle : NULL;
+  if (!empty($node_type) && ($node_type . '_node_edit_form' == $form_id || $node_type . '_node_form' == $form_id)) {
     // exclude for title
-    if (user_access('use exclude node title')) {
-      if (_exclude_node_title($form['#node'], 'nodeform')) {
-        drupal_set_title('');
+
+    if (\Drupal::currentUser()->hasPermission('use exclude node title')) {
+
+      $node = $form_state['controller']->getEntity();
+      if ($node_type . '_node_edit_form' == $form_id && _exclude_node_title($node->id(), 'nodeform')) {
+        $form['title']['#access'] = FALSE;
       }
     }
     // --------------
     // make sure user have permissions correct
-    if (!exclude_node_title_check_perm($form['#node'])) {
+    if (!exclude_node_title_check_perm($node)) {
       return FALSE;
     }
-    
+
     // don't bother to add form element if the content type isn't configured
     // to be excluded by user...
-    if (variable_get('exclude_node_title_content_type_value_' . $form['#node']->type) == 'user') {
+    if (_exclude_node_title_var_get('exclude_node_title_content_type_value_' . $node->get('type')->getString()) == 'user') {
       $weight = $form['title']['#weight'] + 0.1;
       $form['exclude_node_title'] = array(
         '#type' => 'checkbox',
+        '#field_name' => 'exclude_node_title',
         '#title' => t('Exclude title from display'),
         '#required' => FALSE,
-        '#default_value' => (!empty($form['nid']['#value']) ? in_array($form['nid']['#value'], variable_get('exclude_node_title_nid_list', array())) : FALSE ),
+        '#element_validate' => array('exclude_node_title_set_form_value'),
+        '#default_value' => in_array($node->id(), _exclude_node_title_var_get('exclude_node_title_nid_list', array())),
         '#weight' => $weight,
       );
-      if (module_exists('translation') && variable_get('exclude_node_title_translation_sync', TRUE) == TRUE && translation_supported_type($form['#node']->type) && !empty($form['nid']['#value'])) {
+
+      if (\Drupal::moduleHandler()->moduleExists('translation') && _exclude_node_title_var_get('exclude_node_title_translation_sync') == TRUE && translation_supported_type($node->get('type')->getString()) && !empty($nid)) {
         // get tnid
         $tnid = db_select('node', 'n')
           ->fields('n', array('tnid'))
-          ->condition('nid', $form['nid']['#value'])
+          ->condition('nid', $nid)
           ->execute()
           ->fetchAssoc();
-        if ($tnid['tnid'] != $form['nid']['#value']) {
+        if ($tnid['tnid'] != $nid) {
           $form['exclude_node_title']['#description'] = t("Check !here if you don't have title disabled in the source language of this node.", array('!here' => l(t('here'), 'node/' . $tnid['tnid'] . '/edit')));
         }
       }
@@ -194,16 +200,18 @@ function exclude_node_title_form_alter(&$form, &$form_state, $form_id) {
  * Set exclude_node_title flag for the given node.
  */
 function exclude_node_title_set_flag($node, $value = 1) {
-  $exclude_list = variable_get('exclude_node_title_nid_list', array());
-  $is_excluded = array_search($node->nid, $exclude_list);
+
+  $exclude_list = _exclude_node_title_var_get('exclude_node_title_nid_list', array());
+  $nid = $node->id();
+  $is_excluded = array_search($node->id(), $exclude_list);
   if ($value == 1 && $is_excluded === FALSE) {
-    $exclude_list[] = $node->nid;
-    variable_set('exclude_node_title_nid_list', $exclude_list);
+    $exclude_list[] = $node->id();
+    _exclude_node_title_var_set('exclude_node_title_nid_list', $exclude_list);
     return;
   }
   if ($value == 0 && $is_excluded !== FALSE) {
     unset($exclude_list[$is_excluded]);
-    variable_set('exclude_node_title_nid_list', $exclude_list);
+    _exclude_node_title_var_set('exclude_node_title_nid_list', $exclude_list);
     return;
   }
 }
@@ -212,10 +220,11 @@ function exclude_node_title_set_flag($node, $value = 1) {
  * Implements hook_field_attach_delete_bundle().
  */
 function exclude_node_title_field_attach_delete_bundle($entity_type, $bundle, $instances) {
+  $config = \Drupal::config('exclude_node_title.settings');
   // when deleting a content type, we make sure and clean our variable :)
   if ($entity_type == 'node') {
-    variable_del('exclude_node_title_content_type_value_' . $bundle);
-    variable_del('exclude_node_title_content_type_modes_' . $bundle);
+    $config->delete('exclude_node_title_content_type_value_' . $bundle);
+    $config->delete('exclude_node_title_content_type_modes_' . $bundle);
   }
 }
 
@@ -227,15 +236,16 @@ function exclude_node_title_field_attach_delete_bundle($entity_type, $bundle, $i
  *   Returns boolean TRUE if should be hidden, FALSE when not
  */
 function _exclude_node_title($param, $view_mode = 'full') {
-  list($nid, $node_type) = _exclude_node_title_get_node($param);
+
+  list($nid, $node_type) = _exclude_node_title_var_get_node($param);
   
   // get exclude settings
   static $exclude_settings;
   if (!isset($exclude_settings)) {
-    foreach (_node_types_build()->names as $key => $val) {
+    foreach ($node_types = node_type_get_names() as $key => $val) {
       $exclude_settings[$key] = array(
-        'type'  => variable_get('exclude_node_title_content_type_value_' . $key, 'none'),
-        'modes' => variable_get('exclude_node_title_content_type_modes_' . $key, array()),
+        'type'  => _exclude_node_title_var_get('exclude_node_title_content_type_value_' . $key, 'none'),
+        'modes' => _exclude_node_title_var_get('exclude_node_title_content_type_modes_' . $key, array()),
       );
     }
   }
@@ -249,10 +259,10 @@ function _exclude_node_title($param, $view_mode = 'full') {
         return FALSE;
 
       // we look for the nid list
-      $nid_exclude_list = variable_get('exclude_node_title_nid_list', array());
+      $nid_exclude_list = _exclude_node_title_var_get('exclude_node_title_nid_list', array());
       $nid_list = array($nid => $nid);
 
-      if (module_exists('translation') && variable_get('exclude_node_title_translation_sync', TRUE) == TRUE && translation_supported_type($node_type)) {
+      if (\Drupal::moduleHandler()->moduleExists('translation') && _exclude_node_title_var_get('exclude_node_title_translation_sync') == TRUE && translation_supported_type($node_type)) {
         // get tnid
         $tnid = db_select('node', 'n')
           ->fields('n', array('tnid'))
@@ -291,7 +301,7 @@ function _exclude_node_title($param, $view_mode = 'full') {
  * @return
  *   Returns an array with node id and node type, or FALSE if there were errors.
  */
-function _exclude_node_title_get_node($param) {
+function _exclude_node_title_var_get_node($param) {
     // we accept only integer and object
     if (!is_object($param) && !is_numeric($param)) {
         return FALSE;
@@ -308,41 +318,20 @@ function _exclude_node_title_get_node($param) {
         $node = $param;
         unset($param); // memory cleanup
     }
+    if (isset($node)) {
+      $node_type = $node->get('type')->getString();
+    }
 
-    // Check that the node exists 
     if (!isset($node) || !isset($node->type))
         return FALSE;
 
-    $node_type = $node->type;
-    $nid = isset($node->nid)? $node->nid : FALSE;
+    $nid = !empty($node->id())? $node->id() : FALSE;
     unset($node); // memory cleanup
 
     return array($nid, $node_type);
 }
 
-/**
- * Implements hook_field_extra_fields().
- */
-function exclude_node_title_field_extra_fields() {
-  $extra = array();
 
-  foreach (node_type_get_types() as $type) {
-    $exclude_type = variable_get('exclude_node_title_content_type_value_' . $type->type, 'none');
-    if ($exclude_type != 'user')
-        continue;
-
-    $extra['node'][$type->type]['form'] = array(
-      'exclude_node_title' => array(
-        'label' => t('Exclude Node Title'),
-        'description' => t('Exclude node title from display.'),
-        'weight' => 0,
-        'visible' => TRUE,
-      ),
-    );
-  }
-  
-  return $extra;
-}
 
 /**
  * Implements hook_ds_fields_info_alter().
@@ -369,4 +358,35 @@ function _exclude_node_title_ds_render_field($field) {
     $field['entity']->title = '';
   }
   return ds_render_field($field);
+}
+
+/**
+ * Function getting exclude_node_title variables
+ */
+function _exclude_node_title_var_get($variable, $default = NULL) {
+  $config = \Drupal::config('exclude_node_title.settings');
+
+  if (!($value = $config->get($variable))) {
+    $value = $default;
+  }
+
+  return $value;
+}
+
+/**
+ * Function setting exclude_node_title variables
+ */
+function _exclude_node_title_var_set($variable, $value) {
+  $config = \Drupal::config('exclude_node_title.settings');
+  $config->set($variable, $value)->save();
+
+  return;
+}
+
+/**
+ * Function setting node meta field value to make possible parsing it by hooks
+ */
+function exclude_node_title_set_form_value($element, &$form_state, $form) {
+  $node = $form_state['controller']->getEntity();
+  $node->exclude_node_title = $form_state['values']['exclude_node_title'];
 }
