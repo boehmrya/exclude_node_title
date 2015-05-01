@@ -4,3 +4,6 @@ description: 'Excludes a node title from display. It provides a checkbox on node
 core: 8.x
 package: Other
 configure: exclude_node_title.settings
+
+dependencies:
+  - node

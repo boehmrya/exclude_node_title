@@ -3,9 +3,9 @@
 namespace Drupal\exclude_node_title\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
-use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Entity\Display\EntityViewDisplayInterface;
-use Symfony\Component\DependencyInjection\ContainerInterface;
+use Drupal\Component\Utility\Unicode;
+use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Url;
 
 class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
 
@@ -19,35 +19,36 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function buildForm(array $form, array &$form_state) {
+  protected function getEditableConfigNames() {
+    return [
+      'exclude_node_title.settings',
+    ];
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  public function buildForm(array $form, FormStateInterface $form_state) {
     // Display login form:
+    $enabled_link = \Drupal::l(t('enabled'), Url::fromRoute('system.modules_list'));
     $form['exclude_node_title_search'] = array(
       '#type' => 'checkbox',
-      '#title' => $this->t('Remove node title from search pages'),
-      '#description' => $this->t('Select if you wish to remove title from search pages. You need to have Search module !url.', array('!url' => l(t('enabled'), 'admin/modules/list'))),
+      '#title' => t('Remove node title from search pages'),
+      '#description' => t('Select if you wish to remove title from search pages. You need to have Search module !link.', array('!link' => $enabled_link)),
       '#default_value' => _exclude_node_title_var_get('exclude_node_title_search', 0),
-      '#disabled' => !module_exists('search')
+      '#disabled' => !\Drupal::moduleHandler()->moduleExists('search'),
     );
 
     $form['exclude_node_title_content_type'] = array(
       '#type' => 'fieldset',
-      '#title' => $this->t('Exclude title by content-types'),
-      '#description' => $this->t('Define title excluding settings for each content type.'),
+      '#title' => t('Exclude title by content-types'),
+      '#description' => t('Define title excluding settings for each content type.'),
       '#collapsible' => TRUE,
       '#collapsed' => FALSE,
     );
     $node_types = node_type_get_names();
     foreach ($node_types as $node_type => $node_type_label) {
-      $form['#attached']['js'][] = array(
-        'data' => array(
-          'exclude_node_title' => array(
-            'content_types' => array(
-              $node_type => $node_type_label,
-            ),
-          ),
-        ),
-        'type' => 'setting',
-      );
+      $form['#attached']['drupalSettings']['exclude_node_title']['content_types'][$node_type] = $node_type_label;
       $form['exclude_node_title_content_type']['exclude_node_title_content_type_value_' . $node_type] = array(
         '#type' => 'select',
         '#title' => $node_type_label,
@@ -64,20 +65,20 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
 
       switch ($form['exclude_node_title_content_type']['exclude_node_title_content_type_value_' . $node_type]['#default_value']) {
         case 'all':
-          $title = 'Exclude title from all nodes in the following view modes:';
+          $title = t('Exclude title from all nodes in the following view modes:');
           break;
 
         case 'user defined':
-          $title = 'Exclude title from user defined nodes in the following view modes:';
+          $title = t('Exclude title from user defined nodes in the following view modes:');
           break;
 
         default:
-          $title = 'Exclude from:';
+          $title = t('Exclude from:');
       }
 
       $form['exclude_node_title_content_type']['exclude_node_title_content_type_modes_' . $node_type] = array(
         '#type' => 'checkboxes',
-        '#title' => $this->t($title),
+        '#title' => $title,
         '#default_value' => _exclude_node_title_var_get('exclude_node_title_content_type_modes_' . $node_type, array()),
         '#options' => $modes,
         '#states' => array(
@@ -88,10 +89,7 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
         ),
       );
     }
-    $page['#attached']['js'][] = array(
-      'data' => drupal_get_path('module', 'exclude_node_title') . '/exclude_node_title.js',
-      'type' => 'file',
-    );
+    $form['#attached']['library'][] = 'exclude_node_title/drupal.exclude_node_title.admin';
 
     return parent::buildForm($form, $form_state);
   }
@@ -99,11 +97,11 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
   /**
    * {@inheritdoc}
    */
-  public function submitForm(array &$form, array &$form_state) {
-    $config = \Drupal::config('exclude_node_title.settings');
+  public function submitForm(array &$form, FormStateInterface $form_state) {
+    $config = \Drupal::configFactory()->getEditable('exclude_node_title.settings');
 
-    foreach ($form_state['values'] as $key => $value) {
-      if (drupal_substr($key, 0, 18) == 'exclude_node_title') {
+    foreach ($form_state->getValues() as $key => $value) {
+      if (Unicode::substr($key, 0, 18) == 'exclude_node_title') {
         $config->set($key, $value);
       }
     }

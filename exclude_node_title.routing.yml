@@ -1,7 +1,7 @@
 exclude_node_title.settings:
   path: '/admin/config/content/exclude_node_title'
   defaults:
-    _content: '\Drupal\exclude_node_title\Controller\ExcludeNodeTitleController::adminSettings'
+    _form: '\Drupal\exclude_node_title\Form\ExcludeNodeTitleAdminSettingsForm'
     _title: 'Exclude Node Title'
   requirements:
     _permission: 'administer exclude node title'
