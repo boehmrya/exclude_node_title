@@ -18,8 +18,7 @@
 
   Drupal.behaviors.exclude_node_title = {
     attach: function (context, settings) {
-      for (type in Drupal.settings.exclude_node_title.content_types) {
-        var type_label = Drupal.settings.exclude_node_title.content_types[type];
+      for (type in settings.exclude_node_title.content_types) {
         $('#edit-exclude-node-title-content-type-value-' + type).change(update_label(type));
       }
     }

@@ -21,9 +21,8 @@ function exclude_node_title_uninstall() {
   $config = \Drupal::configFactory()->getEditable('exclude_node_title.settings');
   $config->delete('exclude_node_title_nid_list');
   $config->delete('exclude_node_title_search');
-  foreach (node_type_get_names() as $key => $val) {
-    $config->delete('exclude_node_title_content_type_value_' . $key);
-    $config->delete('exclude_node_title_content_type_modes_' . $key);
-  }
+  $config->delete('exclude_node_title_content_type_value');
+  $config->delete('exclude_node_title_content_type_modes');
+
   $config->save();
 }

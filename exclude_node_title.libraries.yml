@@ -8,3 +8,4 @@ drupal.exclude_node_title.admin:
   dependencies:
     - core/jquery
     - core/drupal
+    - core/drupalSettings

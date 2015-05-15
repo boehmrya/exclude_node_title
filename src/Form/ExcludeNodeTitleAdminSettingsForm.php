@@ -3,7 +3,7 @@
 namespace Drupal\exclude_node_title\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
-use Drupal\Component\Utility\Unicode;
+use Drupal\Core\Cache\Cache;
 use Drupal\Core\Form\FormStateInterface;
 use Drupal\Core\Url;
 
@@ -31,6 +31,8 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
   public function buildForm(array $form, FormStateInterface $form_state) {
     // Display login form:
     $enabled_link = \Drupal::l(t('enabled'), Url::fromRoute('system.modules_list'));
+    $form['#attached']['library'][] = 'system/drupal.system';
+
     $form['exclude_node_title_search'] = array(
       '#type' => 'checkbox',
       '#title' => t('Remove node title from search pages'),
@@ -39,20 +41,21 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
       '#disabled' => !\Drupal::moduleHandler()->moduleExists('search'),
     );
 
-    $form['exclude_node_title_content_type'] = array(
+    $form['content_type'] = array(
       '#type' => 'fieldset',
       '#title' => t('Exclude title by content-types'),
       '#description' => t('Define title excluding settings for each content type.'),
       '#collapsible' => TRUE,
       '#collapsed' => FALSE,
+      '#tree' => TRUE,
     );
     $node_types = node_type_get_names();
     foreach ($node_types as $node_type => $node_type_label) {
       $form['#attached']['drupalSettings']['exclude_node_title']['content_types'][$node_type] = $node_type_label;
-      $form['exclude_node_title_content_type']['exclude_node_title_content_type_value_' . $node_type] = array(
+      $form['content_type'][$node_type]['content_type_value'] = array(
         '#type' => 'select',
         '#title' => $node_type_label,
-        '#default_value' => _exclude_node_title_var_get('exclude_node_title_content_type_value_' . $node_type, 'none'),
+        '#default_value' => _exclude_node_title_var_get('exclude_node_title_content_type_value.' . $node_type, 'none'),
         '#options' => array('none' => t('None'), 'all' => t('All nodes...'), 'user' => t('User defined nodes...')),
       );
 
@@ -63,7 +66,7 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
       }
       $modes += array('nodeform' => $this->t('Node form'));
 
-      switch ($form['exclude_node_title_content_type']['exclude_node_title_content_type_value_' . $node_type]['#default_value']) {
+      switch ($form['content_type'][$node_type]['content_type_value']['#default_value']) {
         case 'all':
           $title = t('Exclude title from all nodes in the following view modes:');
           break;
@@ -76,15 +79,15 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
           $title = t('Exclude from:');
       }
 
-      $form['exclude_node_title_content_type']['exclude_node_title_content_type_modes_' . $node_type] = array(
+      $form['content_type'][$node_type]['content_type_modes'] = array(
         '#type' => 'checkboxes',
         '#title' => $title,
-        '#default_value' => _exclude_node_title_var_get('exclude_node_title_content_type_modes_' . $node_type, array()),
+        '#default_value' => unserialize(_exclude_node_title_var_get('exclude_node_title_content_type_modes.' . $node_type)),
         '#options' => $modes,
         '#states' => array(
           // Hide the modes when the content type value is <none>.
           'invisible' => array(
-            'select[name="exclude_node_title_content_type_value_' . $node_type . '"]' => array('value' => 'none'),
+            'select[name="content_type[' . $node_type . '][content_type_value]"]' => array('value' => 'none'),
           ),
         ),
       );
@@ -99,16 +102,19 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
    */
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $config = \Drupal::configFactory()->getEditable('exclude_node_title.settings');
-
-    foreach ($form_state->getValues() as $key => $value) {
-      if (Unicode::substr($key, 0, 18) == 'exclude_node_title') {
-        $config->set($key, $value);
-      }
+    $values = $form_state->getValues();
+    foreach ($values['content_type'] as $node_type => $value) {
+      $config->set('exclude_node_title_content_type_value.' . $node_type, $values['content_type'][$node_type]['content_type_value']);
+      $config->set('exclude_node_title_content_type_modes.' . $node_type, serialize($values['content_type'][$node_type]['content_type_modes']));
     }
 
     $config->save();
 
     parent::submitForm($form, $form_state);
+
+    foreach (Cache::getBins() as $service_id => $cache_backend) {
+      $cache_backend->deleteAll();
+    }
   }
 
 }
