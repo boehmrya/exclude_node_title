@@ -12,6 +12,21 @@ use Drupal\Core\Form\FormStateInterface;
 use Drupal\node;
 
 /**
+ * Determines if node should be hidden and user
+ * has permission to have the title hidden.
+ *
+ * @param mixed $param
+ *   Can be a node object or integer value (nid).
+ * @param $view_mode
+ *   View mode, e.g. 'full', 'teaser'...
+ * @return bool
+ *   Returns boolean TRUE if should be hidden, FALSE when not.
+ */
+function exclude_node_title($param, $view_mode) {
+  return (\Drupal::currentUser()->hasPermission('use exclude node title') && _exclude_node_title($param, $view_mode));
+}
+
+/**
  * Implements hook_preprocess_html().
  */
 function exclude_node_title_preprocess_html(&$vars) {
@@ -36,7 +51,6 @@ function exclude_node_title_preprocess_html(&$vars) {
 
   }
 }
-
 
 /**
   * Implements hook_preprocess_page().
@@ -75,7 +89,8 @@ function exclude_node_title_preprocess_node(&$vars) {
  */
 function _exclude_node_title_preprocess(&$vars, $node, $view_mode) {
   if (_exclude_node_title($node, $view_mode)) {
-    list($nid, $node_type) = _exclude_node_title_var_get_node($node);
+    $node_info = _exclude_node_title_var_get_node($node);
+    $node_type = $node_info['node_type'];
 
     switch ($view_mode) {
       case 'nodeform':
@@ -109,27 +124,27 @@ function exclude_node_title_preprocess_search_result(&$vars) {
 }
 
 /**
- * Implements hook_node_update()
+ * Implements hook_node_update().
  */
-function exclude_node_title_node_update(Drupal\node\Entity\Node $node) {
+function exclude_node_title_node_update(node\NodeInterface $node) {
   if (exclude_node_title_check_perm($node)) {
     exclude_node_title_set_flag($node, $node->exclude_node_title);
   }
 }
 
 /**
- * Implements hook_node_insert()
+ * Implements hook_node_insert().
  */
-function exclude_node_title_node_insert(Drupal\node\Entity\Node $node) {
+function exclude_node_title_node_insert(node\NodeInterface $node) {
   if (exclude_node_title_check_perm($node)) {
     exclude_node_title_set_flag($node, $node->exclude_node_title);
   }
 }
 
 /**
- * Implements hook_node_delete()
+ * Implements hook_node_delete().
  */
-function exclude_node_title_node_delete(Drupal\node\Entity\Node $node) {
+function exclude_node_title_node_delete(node\NodeInterface $node) {
   if ($node->exclude_node_title == 1) {
     exclude_node_title_set_flag($node, 0);
   }
@@ -138,10 +153,10 @@ function exclude_node_title_node_delete(Drupal\node\Entity\Node $node) {
 /**
  * Check permission to change node title exclusion.
  *
- * @param \Drupal\node\Entity\Node $node
+ * @param node\NodeInterface $node
  * @return bool
  */
-function exclude_node_title_check_perm(Drupal\node\Entity\Node $node) {
+function exclude_node_title_check_perm(node\NodeInterface $node) {
   $user = \Drupal::currentUser();
 
   if ($user->hasPermission('exclude any node title')) {
@@ -163,7 +178,7 @@ function exclude_node_title_form_alter(&$form, &$form_state, $form_id) {
 
   if ($build_info['callback_object'] instanceof node\NodeForm) {
     $node = $build_info['callback_object']->getEntity();
-    $node_type = $node->get('type')->getString();;
+    $node_type = $node->get('type')->getString();
 
     if (\Drupal::currentUser()->hasPermission('use exclude node title')) {
       if ('node_' . $node_type . '_edit_form' == $form_id && _exclude_node_title($node->id(), 'nodeform')) {
@@ -171,13 +186,12 @@ function exclude_node_title_form_alter(&$form, &$form_state, $form_id) {
       }
     }
 
-    // --------------
-    // make sure user have permissions correct
+    // Make sure user have permissions correct.
     if (!exclude_node_title_check_perm($node)) {
       return FALSE;
     }
 
-    // don't bother to add form element if the content type isn't configured
+    // Don't bother to add form element if the content type isn't configured
     // to be excluded by user...
     if (_exclude_node_title_var_get('exclude_node_title_content_type_value.' . $node_type) == 'user') {
       $weight = $form['title']['#weight'] + 0.1;
@@ -218,7 +232,8 @@ function exclude_node_title_set_flag($node, $value = 1) {
  */
 function exclude_node_title_field_attach_delete_bundle($entity_type, $bundle, $instances) {
   $config = \Drupal::configFactory()->getEditable('exclude_node_title.settings');
-  // when deleting a content type, we make sure and clean our variable :)
+
+  // when deleting a content type, we make sure and clean our variable.
   if ($entity_type == 'node') {
     $config->delete('exclude_node_title_content_type_value.' . $bundle);
     $config->delete('exclude_node_title_content_type_modes.' . $bundle);
@@ -227,17 +242,21 @@ function exclude_node_title_field_attach_delete_bundle($entity_type, $bundle, $i
 
 /**
  * Tells if node should get hidden or not.
- * @param $param
- *   Can be a node object or integer value (nid)
+ * @param mixed $param
+ *   Can be a node object or integer value (nid).
  * @return
- *   Returns boolean TRUE if should be hidden, FALSE when not
+ *   Returns boolean TRUE if should be hidden, FALSE when not.
  */
 function _exclude_node_title($param, $view_mode = 'full') {
-
-  list($nid, $node_type) = _exclude_node_title_var_get_node($param);
-  
   // get exclude settings
   static $exclude_settings;
+
+  if (!($node_info = _exclude_node_title_var_get_node($param))) {
+    return FALSE;
+  }
+
+  $node_type = $node_info['node_type'];
+
   if (!isset($exclude_settings)) {
     foreach ($node_types = node_type_get_names() as $key => $val) {
       $exclude_settings[$key] = array(
@@ -247,14 +266,21 @@ function _exclude_node_title($param, $view_mode = 'full') {
     }
   }
 
+  if (!isset($exclude_settings[$node_type]['type'])) {
+    return FALSE;
+  }
+
   switch ($exclude_settings[$node_type]['type']) {
     case 'all':
       return !empty($exclude_settings[$node_type]['modes'][$view_mode]);
+      break;
 
     case 'user':
-      if (!$nid) {
+      if (!$node_info['nid']) {
         return FALSE;
       }
+
+      $nid = $node_info['nid'];
 
       // we look for the nid list
       $nid_exclude_list = _exclude_node_title_var_get('exclude_node_title_nid_list', array());
@@ -267,19 +293,23 @@ function _exclude_node_title($param, $view_mode = 'full') {
       }
 
       return FALSE;
+      break;
       
     case 'none':
     default:
       return FALSE;
       break;
+
   }
 }
 
 /**
- * Helper function to _exclude_node_title() that extracts node information from $param.
- * @param $param
- *   Can be a node object or integer value (nid)
- * @return
+ * Helper function to _exclude_node_title() that extracts
+ * node information from $param.
+ *
+ * @param mixed $param
+ *   Can be a node object or integer value (nid).
+ * @return mixed
  *   Returns an array with node id and node type, or FALSE if there were errors.
  */
 function _exclude_node_title_var_get_node($param) {
@@ -288,7 +318,6 @@ function _exclude_node_title_var_get_node($param) {
   // we accept only integer and object
   if (!is_object($param) && !is_numeric($param)) {
     return FALSE;
-
   }
 
   // if numeric, load the node with nid
@@ -296,7 +325,7 @@ function _exclude_node_title_var_get_node($param) {
     $node = node\Entity\Node::load($param);
   }
   else {
-    if (is_object($param) && $param instanceof node\Entity\Node) {
+    if (is_object($param) && $param instanceof node\NodeInterface) {
       $node = $param;
     }
   }
@@ -309,7 +338,7 @@ function _exclude_node_title_var_get_node($param) {
     return FALSE;
   }
 
-  return array($node->id(), $node_type);
+  return array('nid' => $node->id(), 'node_type' => $node_type);
 }
 
 /**
@@ -327,8 +356,8 @@ function exclude_node_title_ds_fields_info_alter(&$fields, $entity_type) {
   }
 }
 
-/*
- * Render the field obeying exclude node title settings
+/**
+ * Render the field obeying exclude node title settings.
  */
 function _exclude_node_title_ds_render_field($field) {
   $settings = isset($field['formatter_settings']) ? $field['formatter_settings'] : array();
@@ -340,7 +369,7 @@ function _exclude_node_title_ds_render_field($field) {
 }
 
 /**
- * Function getting exclude_node_title variables
+ * Function getting exclude_node_title variables.
  */
 function _exclude_node_title_var_get($variable, $default = NULL) {
   $config = \Drupal::configFactory()->getEditable('exclude_node_title.settings');
@@ -363,7 +392,7 @@ function _exclude_node_title_var_set($variable, $value) {
 }
 
 /**
- * Function setting node meta field value to make possible parsing it by hooks
+ * Function setting node meta field value to make possible parsing it by hooks.
  */
 function exclude_node_title_set_form_value($element, FormStateInterface $form_state, $form) {
   $values = $form_state->getValues();

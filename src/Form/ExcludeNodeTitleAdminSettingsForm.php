@@ -49,6 +49,7 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
       '#collapsed' => FALSE,
       '#tree' => TRUE,
     );
+
     $node_types = node_type_get_names();
     foreach ($node_types as $node_type => $node_type_label) {
       $form['#attached']['drupalSettings']['exclude_node_title']['content_types'][$node_type] = $node_type_label;
