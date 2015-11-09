@@ -33,39 +33,43 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
     $enabled_link = \Drupal::l(t('enabled'), Url::fromRoute('system.modules_list'));
     $form['#attached']['library'][] = 'system/drupal.system';
 
-    $form['exclude_node_title_search'] = array(
+    $form['exclude_node_title_search'] = [
       '#type' => 'checkbox',
       '#title' => t('Remove node title from search pages'),
-      '#description' => t('Select if you wish to remove title from search pages. You need to have Search module !link.', array('!link' => $enabled_link)),
-      '#default_value' => _exclude_node_title_var_get('exclude_node_title_search', 0),
+      '#description' => t('Select if you wish to remove title from search pages. You need to have Search module @link.', ['@link' => $enabled_link]),
+      '#default_value' => _exclude_node_title_var_get('exclude_node_title_search', FALSE),
       '#disabled' => !\Drupal::moduleHandler()->moduleExists('search'),
-    );
+    ];
 
-    $form['content_type'] = array(
+    $form['content_type'] = [
       '#type' => 'fieldset',
-      '#title' => t('Exclude title by content-types'),
+      '#title' => t('Exclude title by content types'),
       '#description' => t('Define title excluding settings for each content type.'),
       '#collapsible' => TRUE,
       '#collapsed' => FALSE,
       '#tree' => TRUE,
-    );
+    ];
 
     $node_types = node_type_get_names();
     foreach ($node_types as $node_type => $node_type_label) {
       $form['#attached']['drupalSettings']['exclude_node_title']['content_types'][$node_type] = $node_type_label;
-      $form['content_type'][$node_type]['content_type_value'] = array(
+      $form['content_type'][$node_type]['content_type_value'] = [
         '#type' => 'select',
         '#title' => $node_type_label,
         '#default_value' => _exclude_node_title_var_get('exclude_node_title_content_type_value.' . $node_type, 'none'),
-        '#options' => array('none' => t('None'), 'all' => t('All nodes...'), 'user' => t('User defined nodes...')),
-      );
+        '#options' => [
+          'none' => t('None'),
+          'all' => t('All nodes...'),
+          'user' => t('User defined nodes...'),
+        ],
+      ];
 
       $entity_view_modes = \Drupal::entityManager()->getViewModes('node');
       $modes = array();
       foreach ($entity_view_modes as $view_mode_name => $view_mode_info) {
         $modes[$view_mode_name] = $view_mode_info['label'];
       }
-      $modes += array('nodeform' => $this->t('Node form'));
+      $modes += ['nodeform' => $this->t('Node form')];
 
       switch ($form['content_type'][$node_type]['content_type_value']['#default_value']) {
         case 'all':
@@ -80,18 +84,18 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
           $title = t('Exclude from:');
       }
 
-      $form['content_type'][$node_type]['content_type_modes'] = array(
+      $form['content_type'][$node_type]['content_type_modes'] = [
         '#type' => 'checkboxes',
         '#title' => $title,
         '#default_value' => unserialize(_exclude_node_title_var_get('exclude_node_title_content_type_modes.' . $node_type)),
         '#options' => $modes,
-        '#states' => array(
+        '#states' => [
           // Hide the modes when the content type value is <none>.
-          'invisible' => array(
-            'select[name="content_type[' . $node_type . '][content_type_value]"]' => array('value' => 'none'),
-          ),
-        ),
-      );
+          'invisible' => [
+            'select[name="content_type[' . $node_type . '][content_type_value]"]' => ['value' => 'none'],
+          ],
+        ],
+      ];
     }
     $form['#attached']['library'][] = 'exclude_node_title/drupal.exclude_node_title.admin';
 
@@ -109,6 +113,7 @@ class ExcludeNodeTitleAdminSettingsForm extends ConfigFormBase {
       $config->set('exclude_node_title_content_type_modes.' . $node_type, serialize($values['content_type'][$node_type]['content_type_modes']));
     }
 
+    $config->set('exclude_node_title_search', $values['exclude_node_title_search']);
     $config->save();
 
     parent::submitForm($form, $form_state);
